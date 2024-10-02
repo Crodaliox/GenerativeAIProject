@@ -12,31 +12,46 @@ from PIL import Image
 image = Image.open("lib\imgTest\lemans.jpg")
 
 transform = transforms.Compose([
-    #transforms.Resize((128, 128)),  # Redimensionnement l'image à 128x128 pour simplifier
+    transforms.Resize((128, 128)),  # Redimensionnement l'image à 128x128 pour simplifier
     transforms.ToTensor()           # Convertir en tenseur PyTorch (matrice de donnée)
 ])
 input_image = transform(image).unsqueeze(0)  
 
-# Définition de la couche de convolution
-conv1 = nn.Conv2d(3, 3, 4, 2, 1, bias=False)
+# Définition de la convolution
+conv1 = nn.Conv2d(3, 9, 4, 2, 1, bias=False)
 output = conv1(input_image)
+
+# 3. Définir la couche de max pooling après la convolution
+maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+# 5. Appliquer le pooling
+output_pool = maxpool(output)
 
 # Visualisation de l'image d'entrée et les cartes d'activation en sortie
 # Convertir le tenseur d'entrée en image pour affichage
-fig, axs = plt.subplots(1, 4, figsize=(12, 4))
+fig, axs = plt.subplots(1, 7, figsize=(12, 4))
 
 # Afficher l'image originale
 axs[0].imshow(input_image[0].permute(1, 2, 0))  # Permuter les dimensions pour [H, W, C]
 axs[0].set_title('Image originale')
 
-# Afficher les 3 cartes d'activation en sortie (une par filtre)
-for i in range(3):  # Parce que la sortie a 3 canaux
+# Afficher les 6 cannaux de convolution en sortie (une par filtre)
+for i in range(6):  # Parce que la sortie a 3 canaux
     axs[i+1].imshow(output[0, i].detach().numpy(), cmap='gray')  # Afficher chaque canal
-    axs[i+1].set_title(f'Activation {i+1}')
+    axs[i+1].set_title(f'cannal {i+1}')
+
+# Afficher les cartes d'activation après pooling
+fig2, axs2 = plt.subplots(1, 6, figsize=(12, 4))
+for i in range(6):
+    axs2[i].imshow(output_pool[0, i].detach().numpy(), cmap='gray')
+    axs2[i].set_title(f' Pool {i+1}')
 
 # Désactiver les axes
 for ax in axs:
     ax.axis('off')
+    
+for ax in axs2:
+   ax.axis('off')
 
 plt.show()
 
