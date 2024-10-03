@@ -120,7 +120,7 @@ axs[1].axis('off')
 axs[2].bar(range(10), outputExit.detach().numpy()[0])
 axs[2].set_title('Sortie de la couche entièrement connectée')
 axs[2].set_xlabel('Neurones')
-axs[2].set_ylabel('Activation')
+axs[2].set_ylabel('Probabilité')
 
 plt.tight_layout()
 plt.show()
