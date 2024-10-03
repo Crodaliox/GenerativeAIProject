@@ -3,7 +3,9 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.transforms as transforms
+
 
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -15,11 +17,15 @@ from keras import layers
 # Load the data and split it between train and test sets
 (X_train, Y_train), (X_test, Y_test) = keras.datasets.mnist.load_data()
 
+# Normalisation des images de la database entre 0 et 1
+X_train = X_train.astype(np.float32) / 255.0
+X_test = X_test.astype(np.float32) / 255.0
+
 # plot a sample
 input_imageMnist = X_train[1]
 # plot the sample
 figMnist = plt.figure
-# plt.imshow(input_imageMnist, cmap='gray')
+plt.imshow(input_imageMnist, cmap='gray')
 # plt.show()
 
 #Chargement d'une image
@@ -39,7 +45,7 @@ input_image = imgToTensor(input_imageMnist).unsqueeze(0)
         # 5 - padding (rajoute des pixels autour de l'image pour ne pas la faire retrecir au passage du filtre)
 
 conv1 = nn.Conv2d(1, 64, 5, 1, 0, bias=False)
-output = conv1(input_image)
+output = F.leaky_relu(conv1(input_image)) #Leaky_relu mets toutes les valeurs négatifs à un petit coef (0.01) 
 print(output.size())
 
 # Appliquer un pooling maximal sur l'image
@@ -71,7 +77,7 @@ for ax in axs:
 
 # 2eme itération de convolution
 conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
-outputconv2 = conv2(output_pool)
+outputconv2 = F.leaky_relu(conv2(output_pool)) 
 print(outputconv2.size())
 
 #Max Pooling de la conv2
@@ -82,10 +88,34 @@ for i in range(64):  # Parce que la sortie a 3 canaux
     axs[i].imshow(output_pool2[0, i].detach().numpy(), cmap='gray')  # Afficher chaque canal
     # axs[i].set_title(f'End {i+1}')
 
+#On mets le resultat en une seul dimension avant de passer dans la couche fully connected
+output_flat = output_pool2.view(-1, 64 * 4 * 4)  # Flatten (mise a 1 dimension) (1x1024) : view permet de manipuler la forme d'un tensor pytorch (-1 permet de)
+print("Après flatten:", output_flat.size())
+
+#Creation de la couche "fully connected layer"
+fcl = nn.Linear(1024, 128)
+outputFCL = fcl(output_flat)
 
 
+fig, axs = plt.subplots(3, 1, figsize=(8, 12))
+
+
+axs[0].imshow(input_image[0,0].detach().numpy(), cmap='gray')
+axs[0].set_title('Image d\'entrée (MNIST)')
+axs[0].axis('off')
+
+
+axs[1].imshow(output_pool2[0].detach().numpy(), cmap='gray')
+axs[1].set_title('Activations après Max Pooling')
+axs[1].axis('off')
+
+
+axs[2].bar(range(128), outputFCL.detach().numpy()[0])
+axs[2].set_title('Sortie de la couche entièrement connectée')
+axs[2].set_xlabel('Neurones')
+axs[2].set_ylabel('Activation')
+
+plt.tight_layout()
 plt.show()
-
-
 
     
