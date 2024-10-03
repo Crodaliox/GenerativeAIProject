@@ -45,7 +45,7 @@ input_image = imgToTensor(input_imageMnist).unsqueeze(0)
         # 5 - padding (rajoute des pixels autour de l'image pour ne pas la faire retrecir au passage du filtre)
 
 conv1 = nn.Conv2d(1, 64, 5, 1, 0, bias=False)
-output = F.leaky_relu(conv1(input_image)) #Leaky_relu mets toutes les valeurs négatifs à un petit coef (0.01) 
+output = conv1(input_image) #Leaky_relu mets toutes les valeurs négatifs à un petit coef (0.01) 
 print(output.size())
 
 # Appliquer un pooling maximal sur l'image
@@ -77,7 +77,7 @@ for ax in axs:
 
 # 2eme itération de convolution
 conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
-outputconv2 = F.leaky_relu(conv2(output_pool)) 
+outputconv2 = conv2(output_pool)
 print(outputconv2.size())
 
 #Max Pooling de la conv2
@@ -93,10 +93,17 @@ output_flat = output_pool2.view(-1, 64 * 4 * 4)  # Flatten (mise a 1 dimension) 
 print("Après flatten:", output_flat.size())
 
 #Creation de la couche "fully connected layer"
+
+# Création de la couche entièrement connectée
 fcl = nn.Linear(1024, 128)
-outputFCL = fcl(output_flat)
+outputFCL = F.leaky_relu(fcl(output_flat))
 
-
+# Sortie (classification avec 10 potentielle valeur)
+fclBin = nn.Linear(128, 10)
+outputExit = F.softmax(fclBin(outputFCL),dim=1)  # Application de la fonction d'activation softmax en sortie pour pouvoir classer selon des probabilités les différentes sortie.
+ # Obtenir la classe prédite
+predicted_class = torch.max(outputExit, 1)
+print("Classe prédicte : ", predicted_class)
 fig, axs = plt.subplots(3, 1, figsize=(8, 12))
 
 
@@ -110,7 +117,7 @@ axs[1].set_title('Activations après Max Pooling')
 axs[1].axis('off')
 
 
-axs[2].bar(range(128), outputFCL.detach().numpy()[0])
+axs[2].bar(range(10), outputExit.detach().numpy()[0])
 axs[2].set_title('Sortie de la couche entièrement connectée')
 axs[2].set_xlabel('Neurones')
 axs[2].set_ylabel('Activation')
