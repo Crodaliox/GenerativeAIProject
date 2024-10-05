@@ -45,7 +45,7 @@ input_image = imgToTensor(input_imageMnist).unsqueeze(0)
         # 5 - padding (rajoute des pixels autour de l'image pour ne pas la faire retrecir au passage du filtre)
 
 conv1 = nn.Conv2d(1, 64, 5, 1, 0, bias=False)
-output = conv1(input_image) #Leaky_relu mets toutes les valeurs négatifs à un petit coef (0.01) 
+output = conv1(input_image) #Leaky_relu est l'algo de perceptron permettant de définir si l'image correspond au résultat attendu ou pas
 print(output.size())
 
 # Appliquer un pooling maximal sur l'image

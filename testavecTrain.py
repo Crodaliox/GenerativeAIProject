@@ -14,6 +14,15 @@ from PIL import Image
 import keras
 from keras import layers
 
+
+#Initialisation
+#On defini une variable permettant de vérifier si un GPU est disponible
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
+
+
+
+
 # On load le database d'image qui servira d'entrainement
 (X_train, Y_train), (X_test, Y_test) = keras.datasets.mnist.load_data()
 # X_train= image
@@ -31,6 +40,37 @@ print(X_train_tensor.shape)
 print(Y_train_tensor.shape)
 
 #entrainement !
-# Sélectionner les 10 premières images pour l'entraînement
-# X_train_10 = X_train_tensor[:10]
-# Y_train_10 = Y_train_tensor[:10]
+
+# On selectionne 10 img et 10 label
+X_train_10 = X_train_tensor[:10]
+Y_train_10 = Y_train_tensor[:10]
+
+#Creation du CNN avec une class
+class CNN:
+    def __init__(self, nbIteration):
+        self.nbIteration = nbIteration
+
+    def FonctionnementModel(self):
+        #Dans cette methode, on définit l'ensemble des étapes qui constitue le model CNN
+        self.conv1 = nn.Conv2d(1, 64, 5, 1, 0, bias=False)
+        self.maxpolling1=nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
+        self.maxpolling2=nn.MaxPool2d(kernel_size=2, stride=2).view(-1, 64 * 4 * 4)
+        self.fcl1 = nn.Linear(1024, 128)
+        self.fcl2 = nn.Linear(128,10)
+        
+    def ForwardPropagation(self,x):
+        #On vient appliquer des fonctions d'activation sur chaque perceptron du model
+        x = F.leaky_relu(self.conv1(x))
+        x = self.maxpolling1(x)
+        x = F.leaky_relu(self.conv2(x))
+        x = self.maxpolling2(x)
+        x = F.leaky_relu(self.fcl1(x))
+        x = F.softmax(self.fcl2(x),dim=1)
+
+        return x
+    
+
+
+    
+    
