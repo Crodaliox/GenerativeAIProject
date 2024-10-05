@@ -33,8 +33,7 @@ X_test = X_test.astype(np.float32) / 255.0
 
 X_train_tensor = torch.tensor(X_train)[:, np.newaxis, :, :] #images sous forme de tenseur à 4 dimensions ((batch_size, channels, height, width)
 Y_train_tensor = torch.tensor(Y_train).long()  # .long mets chaque valeur a 64 bits
-print(X_train_tensor.shape)
-print(Y_train_tensor.shape)
+
 
 #entrainement !
 
@@ -43,23 +42,26 @@ X_train_10 = X_train_tensor[:10]
 Y_train_10 = Y_train_tensor[:10]
 
 #Creation du CNN avec une class
-class CNN:
+class CNN(nn.Module):
+
 
     def __init__(self):
-        #Dans cette methode, on définit l'ensemble des étapes qui constitue le model CNN
-        self.conv1 = nn.Conv2d(1, 64, 5, 1, 0, bias=False)
-        self.maxpolling1=nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
-        self.maxpolling2=nn.MaxPool2d(kernel_size=2, stride=2)
-        self.fcl1 = nn.Linear(1024, 128)
-        self.fcl2 = nn.Linear(128,10)
+            #Dans cette methode, on définit l'ensemble des étapes qui constitue le model CNN
+            super(CNN, self).__init__()  # On ajoute les fonction du constructeur de nn.Module
+            self.conv1 = nn.Conv2d(1, 64, 5, 1, 0, bias=False)
+            self.maxpooling1 = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
+            self.maxpooling2 = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.fcl1 = nn.Linear(64 * 4 * 4, 128)  
+            self.fcl2 = nn.Linear(128, 10)
+    
         
     def ForwardPropagation(self,x):
         #On vient appliquer des fonctions d'activation sur chaque perceptron du model
         x = F.leaky_relu(self.conv1(x))
-        x = self.maxpolling1(x)
+        x = self.maxpooling1(x)
         x = F.leaky_relu(self.conv2(x))
-        x = self.maxpolling2(x)
+        x = self.maxpooling2(x)
         x = x.view(-1, 64 * 4 * 4)
         x = F.leaky_relu(self.fcl1(x))
         x = F.softmax(self.fcl2(x),dim=1)
@@ -72,7 +74,21 @@ class CNN:
 #C'est la ou le model CNN va être entrainé avec des données
 
 #Creation du model :
-#model = CNN().to(device)
+model = CNN().to(device)
+
+#Creation de la loss function ou la fonction cout (où l'on va calculer l'errer)
+    #Comparaison entre les etiquettes du Y_test initial à ceux sortie.
+
+    #Pour l'instant fonction utilisé par pytorch.
+    #Elle effectue automatiquement la fonction d'activation de softmax pour chaque valeur
+lossFunction = nn.CrossEntropyLoss()  # cette fonction pytorch est adapté à l'emploi multiclass (ce n'est pas exactement la même lossfonction que sur la vidéo)
+
+#Creation de la fonction de descente de gradient (pour améliorer à chaque itération la loss function)
+    #Principe : bouger la frontiere de decision pour minimiser la LossFunction
+    #Pour ça il faut définir comment réagi la loss fonction en fonction des variations de la frontiere
+    #A revoir pour fonctionnement mais on va utiliser un optimizer déjà integré par pytorch pour l'instant
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # Optimiseur Adam (voir tuto) avec un learning rate de 0.001
+
 
 iteration = 5
 batchSize = 64 # Les données sont séparé par lot de 64
@@ -85,14 +101,29 @@ for iteration in range(iteration):
     allBatch = len(train_loader)  # Nombre total de batchs
 
     for i, (inputs, labels) in enumerate(train_loader):  # Boucle qui traverse chaque batch pour avoir toutes les données
-        inputs, labels = inputs.to(device), labels.to(device)  # Envoye des données des batchs sur GPU
-        
-    #Creation de la loss function ou la fonction cout (où l'on va calculer l'errer)
-    #Comparaison entre les etiquettes du Y_test initial à ceux sortie.
+        X_train_Batch, Y_train_Batch = inputs.to(device), labels.to(device)  # Envoye des données des batchs sur GPU
 
-    #Pour l'instant fonction utilisé par pytorch.
-    #Elle effectue automatiquement la fonction d'activation de softmax pour chaque valeur
+        # Initialisation des gradients
+        optimizer.zero_grad() 
 
+        # On mets les données dans le modèle CNN (il fait toutes les étapes du CNN)
+        CNNoutput = model.ForwardPropagation(X_train_Batch) #C'est les 10 proba obtenu après softmax
 
+        #On calcul le niveau d'erreur à la sortie avec la loss Function
+        lossValue = lossFunction(CNNoutput,Y_train_Batch) #comparaison de la sortie avec les labels de Y_train du début
+
+        #Backward Propagation : On mesure comment cette fonction cout varie à chaque couche de notre model en remontant chaque couche
+        lossValue.backward()
+
+        #On corrige chaque parametre du model (biais etc...) pour modifier la frontiere de descision grace à la descente de gradient
+        optimizer.step() #Il fait la descente de gradient pour ce step
+
+        #(Calcul de la moyenne d'erreur pour chaque batch afin d'avoir la valeur moyenne de perte pour chaque iteration)
+        lossEvaluation += lossValue.item() #.item convertie le tensor obtenu par pytorch en int
     
+    moyenneLoss = lossEvaluation / len(train_loader)
+    print(f"Iteration {iteration+1}, Erreur moyenne : {moyenneLoss}")
+
+
+
     
