@@ -36,10 +36,10 @@ Y_train_tensor = torch.tensor(Y_train).long()  # .long mets chaque valeur a 64 b
 
 
 #entrainement !
-
+iteration = 1000
 # On selectionne 10 img et 10 label
-X_train_10 = X_train_tensor[:10]
-Y_train_10 = Y_train_tensor[:10]
+X_train_10 = X_train_tensor[:iteration].to(device)
+Y_train_10 = Y_train_tensor[:iteration].to(device)
 
 #Creation du CNN avec une class
 class CNN(nn.Module):
@@ -56,7 +56,7 @@ class CNN(nn.Module):
             self.fcl2 = nn.Linear(128, 10)
     
         
-    def ForwardPropagation(self,x):
+    def forward(self,x):
         #On vient appliquer des fonctions d'activation sur chaque perceptron du model
         x = F.leaky_relu(self.conv1(x))
         x = self.maxpooling1(x)
@@ -90,40 +90,57 @@ lossFunction = nn.CrossEntropyLoss()  # cette fonction pytorch est adapté à l'
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # Optimiseur Adam (voir tuto) avec un learning rate de 0.001
 
 
-iteration = 5
+
 batchSize = 64 # Les données sont séparé par lot de 64
 # Créer un DataLoader pour charger les données par lots et les mélanger pour ne pas avoir toujours la même chose
-train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train_tensor, Y_train_tensor), batch_size=batchSize, shuffle=True)
+#train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train_tensor, Y_train_tensor), batch_size=batchSize, shuffle=True)
 
-for iteration in range(iteration):
+for i in range(iteration):
+
+    total_loss=0.0
 
     lossEvaluation=0.0
-    allBatch = len(train_loader)  # Nombre total de batchs
+    #allBatch = len(train_loader)  # Nombre total de batchs
 
-    for i, (inputs, labels) in enumerate(train_loader):  # Boucle qui traverse chaque batch pour avoir toutes les données
-        X_train_Batch, Y_train_Batch = inputs.to(device), labels.to(device)  # Envoye des données des batchs sur GPU
+    # Initialisation des gradients
+    optimizer.zero_grad() 
 
-        # Initialisation des gradients
-        optimizer.zero_grad() 
+    # On mets les données dans le modèle CNN (il fait toutes les étapes du CNN)
+    CNNoutput = model(X_train_10[i].unsqueeze(0)) #C'est les 10 proba obtenu après softmax
 
-        # On mets les données dans le modèle CNN (il fait toutes les étapes du CNN)
-        CNNoutput = model.ForwardPropagation(X_train_Batch) #C'est les 10 proba obtenu après softmax
+    #On calcul le niveau d'erreur à la sortie avec la loss Function
+    lossValue = lossFunction(CNNoutput,Y_train_10[i].unsqueeze(0)) #comparaison de la sortie avec les labels de Y_train du début
 
-        #On calcul le niveau d'erreur à la sortie avec la loss Function
-        lossValue = lossFunction(CNNoutput,Y_train_Batch) #comparaison de la sortie avec les labels de Y_train du début
+    #Backward Propagation : On mesure comment cette fonction cout varie à chaque couche de notre model en remontant chaque couche
+    lossValue.backward()
 
-        #Backward Propagation : On mesure comment cette fonction cout varie à chaque couche de notre model en remontant chaque couche
-        lossValue.backward()
+    #On corrige chaque parametre du model (biais etc...) pour modifier la frontiere de descision grace à la descente de gradient
+    optimizer.step() #Il fait la descente de gradient pour ce step
 
-        #On corrige chaque parametre du model (biais etc...) pour modifier la frontiere de descision grace à la descente de gradient
-        optimizer.step() #Il fait la descente de gradient pour ce step
-
-        #(Calcul de la moyenne d'erreur pour chaque batch afin d'avoir la valeur moyenne de perte pour chaque iteration)
-        lossEvaluation += lossValue.item() #.item convertie le tensor obtenu par pytorch en int
+    #(Calcul de la moyenne d'erreur pour chaque batch afin d'avoir la valeur moyenne de perte pour chaque iteration)
     
-    moyenneLoss = lossEvaluation / len(train_loader)
-    print(f"Iteration {iteration+1}, Erreur moyenne : {moyenneLoss}")
+    total_loss += lossValue.item()
+
+    
+    average_loss = total_loss / (i + 1)  # Moyenne jusqu'à l'itération courante
+    print(f"Iteration {i + 1}/{iteration}, Erreur moyenne : {average_loss}")
+
+    predicted_class = torch.max(CNNoutput, 1)
+    print("Classe prédicte : ", predicted_class.indices.cpu().numpy())
 
 
+fig, axs = plt.subplots(2, 1, figsize=(8, 12))
+
+axs[0].imshow(X_train_10[-1][0].cpu().detach().numpy(), cmap='gray')
+axs[0].set_title('Image d\'entrée (MNIST)')
+axs[0].axis('off')
+
+axs[1].bar(range(10), CNNoutput.cpu().detach().numpy()[0])
+axs[1].set_title('Sortie de la couche entièrement connectée')
+axs[1].set_xlabel('Neurones')
+axs[1].set_ylabel('Probabilité')
+
+plt.tight_layout()
+plt.show()
 
     
