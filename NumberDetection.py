@@ -132,7 +132,7 @@ for i in range(iteration):
 fig, axs = plt.subplots(2, 1, figsize=(8, 12))
 
 axs[0].imshow(X_train_10[-1][0].cpu().detach().numpy(), cmap='gray')
-axs[0].set_title('Image d\'entrée (MNIST)')
+axs[0].set_title(f'Image d\'entrée (MNIST) / Iteration : {iteration}')
 axs[0].axis('off')
 
 axs[1].bar(range(10), CNNoutput.cpu().detach().numpy()[0])
