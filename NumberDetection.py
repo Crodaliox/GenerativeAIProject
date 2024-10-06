@@ -36,7 +36,7 @@ Y_train_tensor = torch.tensor(Y_train).long()  # .long mets chaque valeur a 64 b
 
 
 #entrainement !
-iteration = 1000
+iteration = 5000
 # On selectionne 10 img et 10 label
 X_train_10 = X_train_tensor[:iteration].to(device)
 Y_train_10 = Y_train_tensor[:iteration].to(device)
@@ -56,7 +56,7 @@ class CNN(nn.Module):
             self.fcl2 = nn.Linear(128, 10)
     
         
-    def forward(self,x):
+    def forwardPropagation(self,x):
         #On vient appliquer des fonctions d'activation sur chaque perceptron du model
         x = F.leaky_relu(self.conv1(x))
         x = self.maxpooling1(x)
@@ -106,7 +106,7 @@ for i in range(iteration):
     optimizer.zero_grad() 
 
     # On mets les données dans le modèle CNN (il fait toutes les étapes du CNN)
-    CNNoutput = model(X_train_10[i].unsqueeze(0)) #C'est les 10 proba obtenu après softmax
+    CNNoutput = model.forwardPropagation(X_train_10[i].unsqueeze(0)) #C'est les 10 proba obtenu après softmax
 
     #On calcul le niveau d'erreur à la sortie avec la loss Function
     lossValue = lossFunction(CNNoutput,Y_train_10[i].unsqueeze(0)) #comparaison de la sortie avec les labels de Y_train du début
@@ -137,7 +137,7 @@ axs[0].axis('off')
 
 axs[1].bar(range(10), CNNoutput.cpu().detach().numpy()[0])
 axs[1].set_title('Sortie de la couche entièrement connectée')
-axs[1].set_xlabel('Neurones')
+axs[1].set_xlabel('Classification (sortie du FCL)')
 axs[1].set_ylabel('Probabilité')
 
 plt.tight_layout()
