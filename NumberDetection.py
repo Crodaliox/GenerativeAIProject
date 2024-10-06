@@ -34,13 +34,6 @@ X_test = X_test.astype(np.float32) / 255.0
 X_train_tensor = torch.tensor(X_train)[:, np.newaxis, :, :] #images sous forme de tenseur à 4 dimensions ((batch_size, channels, height, width)
 Y_train_tensor = torch.tensor(Y_train).long()  # .long mets chaque valeur a 64 bits
 
-
-#entrainement !
-iteration = 5000
-# On selectionne 10 img et 10 label
-X_train_10 = X_train_tensor[:iteration].to(device)
-Y_train_10 = Y_train_tensor[:iteration].to(device)
-
 #Creation du CNN avec une class
 class CNN(nn.Module):
 
@@ -87,11 +80,17 @@ lossFunction = nn.CrossEntropyLoss()  # cette fonction pytorch est adapté à l'
     #Principe : bouger la frontiere de decision pour minimiser la LossFunction
     #Pour ça il faut définir comment réagi la loss fonction en fonction des variations de la frontiere
     #A revoir pour fonctionnement mais on va utiliser un optimizer déjà integré par pytorch pour l'instant
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # Optimiseur Adam (voir tuto) avec un learning rate de 0.001
+grad = torch.optim.Adam(model.parameters(), lr=0.001)  # Optimiseur Adam (voir tuto) avec un learning rate de 0.001
+
+#entrainement !
+iteration = 5000
+# On selectionne 10 img et 10 label
+X_train_10 = X_train_tensor[:iteration].to(device)
+Y_train_10 = Y_train_tensor[:iteration].to(device)
 
 
-
-batchSize = 64 # Les données sont séparé par lot de 64
+#pas utilisé
+#batchSize = 64 # Les données sont séparé par lot de 64
 # Créer un DataLoader pour charger les données par lots et les mélanger pour ne pas avoir toujours la même chose
 #train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train_tensor, Y_train_tensor), batch_size=batchSize, shuffle=True)
 
@@ -103,7 +102,7 @@ for i in range(iteration):
     #allBatch = len(train_loader)  # Nombre total de batchs
 
     # Initialisation des gradients
-    optimizer.zero_grad() 
+    grad.zero_grad() 
 
     # On mets les données dans le modèle CNN (il fait toutes les étapes du CNN)
     CNNoutput = model.forwardPropagation(X_train_10[i].unsqueeze(0)) #C'est les 10 proba obtenu après softmax
@@ -115,7 +114,7 @@ for i in range(iteration):
     lossValue.backward()
 
     #On corrige chaque parametre du model (biais etc...) pour modifier la frontiere de descision grace à la descente de gradient
-    optimizer.step() #Il fait la descente de gradient pour ce step
+    grad.step() #Il fait la descente de gradient pour ce step
 
     #(Calcul de la moyenne d'erreur pour chaque batch afin d'avoir la valeur moyenne de perte pour chaque iteration)
     
@@ -129,6 +128,7 @@ for i in range(iteration):
     print("Classe prédicte : ", predicted_class.indices.cpu().numpy())
 
 
+#affichage
 fig, axs = plt.subplots(2, 1, figsize=(8, 12))
 
 axs[0].imshow(X_train_10[-1][0].cpu().detach().numpy(), cmap='gray')
