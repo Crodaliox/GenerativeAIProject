@@ -1,4 +1,4 @@
-#Projet DeepLearning
+#Projet DeepLearning - Dans ce script, nous allons réaliser un Gan conditionnel permettant de générer n'importe quelle nombre indiqué par l'utilisateur
 import math
 import numpy as np
 import torch
@@ -32,7 +32,7 @@ X_test = X_test.astype(np.float32) / 255.0
 X_train_tensor = torch.tensor(X_train)[:, np.newaxis, :, :] 
 Y_train_tensor = torch.tensor(Y_train).long() 
 
-#Initialisation du CNN
+#Initialisation du CNN Binaire (vrai ou faux)
 class CNN(nn.Module):
 
     def __init__(self):
@@ -42,7 +42,7 @@ class CNN(nn.Module):
             self.conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
             self.maxpooling2 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.fcl1 = nn.Linear(64 * 4 * 4, 128)  
-            self.fcl2 = nn.Linear(128, 10)
+            self.fcl2 = nn.Linear(128, 1) #modif pour avoir un résultat binaire
          
     def forwardPropagation(self,x):
         x = F.leaky_relu(self.conv1(x))
@@ -51,43 +51,88 @@ class CNN(nn.Module):
         x = self.maxpooling2(x)
         x = x.view(-1, 64 * 4 * 4)
         x = F.leaky_relu(self.fcl1(x))
-        x = F.softmax(self.fcl2(x),dim=1)
+        print(torch.sigmoid(self.fcl2(x)))
+        x = torch.sigmoid(self.fcl2(x))
+        
         return x
 
-#Boucle d'entrainement
-#Creation du model :
-model = CNN().to(device)
-#Loss Function
-lossFunction = nn.CrossEntropyLoss() 
-#descente de gradient
-grad = torch.optim.Adam(model.parameters(), lr=0.001)
 
-iteration = 5000
-X_train_10 = X_train_tensor[:iteration].to(device)
-Y_train_10 = Y_train_tensor[:iteration].to(device)
 
-for i in range(iteration):
+#2) creation du réseau Générateur
+  # Dimensionnement du vecteur bruit
+#Generation d'un 1
+class Generator(nn.Module):
+     
+    def __init__(self):
+            super(Generator, self).__init__()
+            #deconvolution
+            self.deconv1 = nn.ConvTranspose2d(100,128,kernel_size=7,stride=2,padding=0) #(Image 7x7 généré 128 fois)
+            self.deconv2 = nn.ConvTranspose2d(128,64,kernel_size=4,stride=2,padding=1)#image 14x14 généré 64 fois
+            self.deconv3 = nn.ConvTranspose2d(64,1,kernel_size=4,stride=2,padding=1) #image 28x28 généré 1 fois
 
-    total_loss=0.0
-    lossEvaluation=0.0
-    # Initialisation des gradients
-    grad.zero_grad() 
-    CNNoutput = model.forwardPropagation(X_train_10[i].unsqueeze(0))
-    #On calcul le niveau d'erreur à la sortie avec la loss Function
-    lossValue = lossFunction(CNNoutput,Y_train_10[i].unsqueeze(0))
-    #Backward Propagation
-    lossValue.backward()
-    #descente de gradient
-    grad.step()
+            # a voir pour rajouter bachnorm
 
-    #Calcul de la moyenne d'erreur pour chaque iteration
-    total_loss += lossValue.item()
-    average_loss = total_loss / (i + 1)
-    print(f"Iteration {i + 1}/{iteration}, Erreur moyenne : {average_loss}")
+    def forward(self,x):
+          x=F.leaky_relu(self.deconv1(x))
+          y=F.leaky_relu(self.deconv2(x))
+          z=F.leaky_relu(self.deconv3(y))
+          print(x.size())
+          print(y.size())
+          print(z.size())
+          return x,y,z
+        
 
-    #Class predicte pour chaque iteration
-    predicted_class = torch.max(CNNoutput, 1)
-    print("Classe prédicte : ", predicted_class.indices.cpu().numpy())
+gen=Generator()  
+noise = torch.randn(1,100,1,1) # 64 échantillons, 100 dimensions, 1x1 (h, w)
+print(noise.size())
+result,result2,result3 = gen(noise)  
+
+#affichage
+fig, axs = plt.subplots(1, 6, figsize=(8, 12))
+fig, axs2 = plt.subplots(1, 6, figsize=(8, 12))
+fig, axs3 = plt.subplots(1, 1, figsize=(8, 12))
+for i in range(6):
+    axs[i].imshow(result[0][i].detach().numpy(), cmap='gray')
+    axs[i].set_title(f'Image')
+    axs[i].axis('off')
+for i in range(6):
+    axs2[i].imshow(result2[0][i].detach().numpy(), cmap='gray')
+    axs2[i].set_title(f'Image')
+    axs2[i].axis('off')
+
+
+    axs3.imshow(result3[0][0].detach().numpy(), cmap='gray')
+    axs3.set_title(f'Image')
+    axs3.axis('off')
+
+gen=Generator()  
+noise = torch.randn(1,100,1,1) # 64 échantillons, 100 dimensions, 1x1 (h, w)
+print(noise.size())
+result,result2,result3 = gen(noise)  
+
+#affichage
+fig, axs = plt.subplots(1, 6, figsize=(8, 12))
+fig, axs2 = plt.subplots(1, 6, figsize=(8, 12))
+fig, axs3 = plt.subplots(1, 1, figsize=(8, 12))
+for i in range(6):
+    axs[i].imshow(result[0][i].detach().numpy(), cmap='gray')
+    axs[i].set_title(f'Image')
+    axs[i].axis('off')
+for i in range(6):
+    axs2[i].imshow(result2[0][i].detach().numpy(), cmap='gray')
+    axs2[i].set_title(f'Image')
+    axs2[i].axis('off')
+
+
+    axs3.imshow(result3[0][0].detach().numpy(), cmap='gray')
+    axs3.set_title(f'Image')
+    axs3.axis('off')
+
+plt.show()
+
+#3) Entrainement du discriminateur
+
+
 
 
 
