@@ -21,7 +21,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 batchsize=1 #Nb d'echantillons traité en même temps
-numberRecreated=2
+chiffreRecrée=3
 
 #1) Creation du réseau Discriminateur
 #Voir algo NumberDetection pour plus de details sur comment il fonctionne
@@ -48,23 +48,34 @@ class CNN(nn.Module):
     def __init__(self):
             super(CNN, self).__init__() 
             self.label_embedding = nn.Linear(10, 28 * 28)  # Embedding du label dans la même taille que l'image
+            self.label_embeddingBin = nn.Linear(1, 28 * 28)  # Embedding du label dans la même taille que l'image
             self.conv1 = nn.Conv2d(2, 64, 5, 1, 0, bias=False) #2 cannaux car cannal + label
+            self.conv11Label = nn.Conv2d(1, 64, 5, 1, 0, bias=False) #1 cannal
             self.maxpooling1 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
             self.maxpooling2 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.fcl1 = nn.Linear(64 * 4 * 4, 128)  
             self.fcl2 = nn.Linear(128, 1) #modif pour avoir un résultat binaire
+            self.fclTrain = nn.Linear(128,11) # résultat pour training
          
-    def forwardPropagation(self,x,labels):
-        label_embedding = self.label_embedding(labels).view(labels.size(0), 1, 28, 28)
-        x = torch.cat([x, label_embedding], dim=1)  # Concaténation image + label
-        x = F.leaky_relu(self.conv1(x))
+    def forwardPropagation(self,x,labels,Disctraining,genTrain):
+        if Disctraining == False:
+            label_embedding = self.label_embedding(labels).view(labels.size(0), 1, 28, 28)
+            x = torch.cat([x, label_embedding], dim=1)  # Concaténation image + label
+            x = F.leaky_relu(self.conv1(x))
+        else:
+             x = F.leaky_relu(self.conv11Label(x))
+            
+        
         x = self.maxpooling1(x)
         x = F.leaky_relu(self.conv2(x))
         x = self.maxpooling2(x)
         x = x.view(-1, 64 * 4 * 4)
         x = F.leaky_relu(self.fcl1(x))
-        x = torch.sigmoid(self.fcl2(x))
+        if Disctraining == True and genTrain==False:
+            x = F.softmax(self.fclTrain(x),dim=1)
+        else:
+            x = torch.sigmoid(self.fcl2(x))
         
         return x
 
@@ -127,10 +138,16 @@ modelDiscr=CNN().to(device)
 
 #Creation de la loss function / optimiseur
 lossFunction = nn.BCELoss()
+lossFunctionCondit = nn.CrossEntropyLoss()
 optimiseurDiscr = torch.optim.Adam(modelDiscr.parameters(), lr=0.001)
+optimiseurDiscrBinaire = torch.optim.Adam(modelDiscr.parameters(), lr=0.001)
 optimiseurGen = torch.optim.Adam(modelGen.parameters(), lr=0.001)
 
-iteration = 60000
+iteration = 10000
+
+# On convertie les labels fourni dans la database en tensor
+Y_train_10 = Y_train_tensor[:iteration].to(device)
+X_train_10 = X_train_tensor[:iteration].to(device)
 
 for i in range(iteration):
 
@@ -141,66 +158,97 @@ for i in range(iteration):
 
      # Initialisation des gradients
     optimiseurDiscr.zero_grad()
+    optimiseurDiscrBinaire.zero_grad()
     
     # Sélection d'un lot d'images réelles
     real_img = X_train_tensor[i * batchsize:(i + 1) * batchsize].to(device)
-    Y_labele = Y_train_tensor[i * batchsize:(i + 1) * batchsize].to(device)
+
     #Creation des labels (pour non conditionnel)
     #real_labels = torch.ones(batchsize,1).to(device)
     #fake_labels = torch.zeros(batchsize,1).to(device)
 
     #Creation des labels (pour conditionnel)
-    choicelabels = create_labels(batchsize,numberRecreated)
+    choicelabels = create_labels(batchsize,3)
+    TestErrorlabels = create_labels(batchsize,1)
     real_labels = torch.ones(batchsize,1).to(device)
     fake_labels = torch.zeros(batchsize,1).to(device)
     
-
-    #passage dans le CNN des vrais images
-    
-    prediction_real   = modelDiscr.forwardPropagation(real_img,create_labels(batchsize,Y_train_tensor[i]))
+    #Entrainement conditionnel
+    #passage dans le CNN des vrais images pour conditionnelle
+    prediction_real   = modelDiscr.forwardPropagation(real_img,Y_train_10[i].unsqueeze(0),True,False)
     #On calcul la loss function uniquement sur la partie des images réels et on attribue un label reel
-    if Y_train_tensor[i]==numberRecreated:
-        loss_real = lossFunction(prediction_real,real_labels)
-    else :
-        loss_real = lossFunction(prediction_real,fake_labels)
-
+    optimiseurDiscr.zero_grad()
+    loss_cond = lossFunctionCondit(prediction_real,Y_train_10[i].unsqueeze(0))
+    loss_cond.backward()
+    optimiseurDiscr.step()
+    optimiseurDiscr.zero_grad()
+    
+    
+    #Entrainement Binaire
+    #passage dans le CNN des vrais images pour binaire (vrai faux)
+    prediction_realBinaire = modelDiscr.forwardPropagation(real_img, create_labels(batchsize,Y_train_10[i]), False, False)
+    #On calcul la loss function uniquement sur la partie des images réels et on attribue un label reel
+    if Y_train_10[i]==chiffreRecrée:
+        loss_Bin_Real = lossFunction(prediction_realBinaire,real_labels)
+    else:
+        loss_Bin_Real = lossFunction(prediction_realBinaire,fake_labels) 
+    #loss_Bin_Real.backward()    
+    
     #Generation d'une image fausse
     noise = torch.randn(batchsize,100,1,1).to(device) # 64 échantillons, 100 dimensions, 1x1 (h, w)
     fake_img=modelGen(noise,choicelabels)
-    #passage de l'image fausse dans le discriminateur et on mets le fake label dessus
-    prediction_fake = modelDiscr.forwardPropagation(fake_img,choicelabels)
-    loss_fake = lossFunction(prediction_fake,fake_labels)
+    # # #passage de l'image fausse dans le discriminateur et on mets le fake label dessus
+    prediction_fake = modelDiscr.forwardPropagation(fake_img,choicelabels,False,False)
+    loss_Bin_Fake = lossFunction(prediction_fake,fake_labels)
 
-    discrloss = loss_real+loss_fake #mesure du discriminateur pour l'optimiseur
-    discrloss.backward()
-    optimiseurDiscr.step()
+    optimiseurDiscrBinaire.zero_grad()
+    discrlossBin = loss_Bin_Real+loss_Bin_Fake #mesure du discriminateur pour l'optimiseur
+    discrlossBin.backward()
+    optimiseurDiscrBinaire.step()
+    optimiseurDiscrBinaire.zero_grad()
     
-    discrtotal_loss += discrloss.item()   
-    print(f"iteration : {i}")  
+
+    # print(f"Iteration {i}, loss: {discrlossBin}")
 
 
     #entrainement generateur
-    if i % 10 == 0: # on entraine le générateur tous les 5 iterations
+     # on entraine le générateur tous les 5 iterations
         
+    if i % 5 == 0 :
         optimiseurGen.zero_grad()
-        #Generation d'une image
+        # #Generation d'une image
         noise = torch.randn(batchsize,100,1,1).to(device) # 64 échantillons, 100 dimensions, 1x1 (h, w)
-        Gen_img=modelGen(noise,choicelabels)
-        
-        prediction_Gen = modelDiscr.forwardPropagation(Gen_img, choicelabels)
-        gen_loss = lossFunction(prediction_Gen, real_labels)
-        print(f"calcul perte gen : {gen_loss}")  
-        gen_loss.backward()
-        optimiseurGen.step()
-        # on définit un seuil de 0.9
-        threshold = 0.9
+        gen_img=modelGen(noise,choicelabels)
+        # # #passage de l'image fausse dans le discriminateur et on mets le fake label dessus
 
-        if torch.mean(prediction_Gen) > threshold:
-            print(f"L'image générée est considérée comme réaliste à {torch.mean(prediction_Gen).item()*100} %.")
-       
+        prediction_gen = modelDiscr.forwardPropagation(gen_img,choicelabels,False,True)
+        loss_gen = lossFunction(prediction_gen,real_labels)
+        
+        loss_gen.backward()
+        optimiseurGen.step()
+        print(f"Iteration {i}, Loss conditionnelle: {loss_cond.item()}, Loss binaire: {discrlossBin.item()}, Gen loss: {loss_gen.item()}") 
+        if i % 1000 == 0:  # affichage des images toutes les 100 itérations
             with torch.no_grad():
-                gen_images = Gen_img.detach().cpu()
+                gen_images = gen_img.detach().cpu()
                 grid = U.make_grid(gen_images, nrow=5, normalize=True)
                 plt.imshow(np.transpose(grid, (1, 2, 0)))
                 print(choicelabels[0])
                 plt.show()
+
+# #affichage
+# fig, axs = plt.subplots(2, 1, figsize=(8, 12))
+
+# axs[0].imshow(real_img[-1][0].cpu().detach().numpy(), cmap='gray')
+# axs[0].set_title(f'Image d\'entrée (MNIST) / Iteration : {iteration}')
+# axs[0].axis('off')
+
+# axs[1].bar(range(11),prediction_real.cpu().detach().numpy()[0])
+# axs[1].set_title('Sortie de la couche entièrement connectée')
+# axs[1].set_xlabel('Classification (sortie du FCL)')
+# axs[1].set_ylabel('Probabilité')
+
+# plt.tight_layout()
+# plt.show()
+
+
+
