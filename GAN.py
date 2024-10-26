@@ -21,7 +21,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 batchsize=1 #Nb d'echantillons traité en même temps
-numberRecreated=2
+numberRecreated=3
 
 #1) Creation du réseau Discriminateur
 #Voir algo NumberDetection pour plus de details sur comment il fonctionne
@@ -193,7 +193,7 @@ for i in range(iteration):
         gen_loss.backward()
         optimiseurGen.step()
         # on définit un seuil de 0.9
-        threshold = 0.9
+        threshold = 0.7
 
         if torch.mean(prediction_Gen) > threshold:
             print(f"L'image générée est considérée comme réaliste à {torch.mean(prediction_Gen).item()*100} %.")
