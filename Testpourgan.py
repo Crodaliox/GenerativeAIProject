@@ -45,10 +45,10 @@ class CNN(nn.Module):
     def __init__(self):
             super(CNN, self).__init__() 
             self.label_embedding = nn.Linear(10, 28 * 28)  # Embedding du label dans la même taille que l'image
-            self.conv1 = nn.Conv2d(2, 64, 5, 1, 0, bias=False) #2 cannaux car cannal + label
-            self.bn1 = nn.BatchNorm2d(64)  # Normalisation pour chaque canal :ajuste les activations pour qu'elles aient une moyenne de 0 et un écart-type de 1
+            self.conv1 = nn.Conv2d(2, 32, 5, 1, 0, bias=False) #2 cannaux car cannal + label
+            self.bn1 = nn.BatchNorm2d(32)  # Normalisation pour chaque canal :ajuste les activations pour qu'elles aient une moyenne de 0 et un écart-type de 1
             self.maxpooling1 = nn.MaxPool2d(kernel_size=2, stride=2)
-            self.conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
+            self.conv2 = nn.Conv2d(32, 64, 5, 1, 0, bias=False)
             self.bn2 = nn.BatchNorm2d(64) 
             self.maxpooling2 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.fcl1 = nn.Linear(64 * 4 * 4, 128)  
@@ -101,8 +101,8 @@ modelDiscr=CNN().to(device)
 
 #Creation de la loss function / optimiseur
 lossFunction = nn.BCELoss()
-optimiseurDiscr = torch.optim.Adam(modelDiscr.parameters(), lr=0.0002)
-optimiseurGen = torch.optim.Adam(modelGen.parameters(), lr=0.00005)
+optimiseurDiscr = torch.optim.Adam(modelDiscr.parameters(), lr=0.00001)
+optimiseurGen = torch.optim.Adam(modelGen.parameters(), lr=0.00001)
 
 
 
@@ -110,7 +110,7 @@ optimiseurGen = torch.optim.Adam(modelGen.parameters(), lr=0.00005)
 #ENTRAINEMENT
 
 # Paramètres d'entraînement
-num_epochs = 20
+num_epochs = 5
 latent_dim = 100  # Dimension de bruit d'entrée pour le générateur
 label_dim = 10    # Nombre de classes de labels (de 0 à 9 pour MNIST)
 #creation du labels du nombres a obtenir en oneshot
@@ -129,9 +129,13 @@ for epoch in range(num_epochs):
         # Initialisation des gradients
         optimiseurDiscr.zero_grad()
 
+        real_img = real_img + 0.05 * torch.randn_like(real_img) #mise en place de léger bruit dans l'image reel
+        
+
         #on mets les données au bon format
         real_img = real_img.to(device).float().to(device)
         img_labels = torch.eye(label_dim)[img_labels_ori].to(device).float()  # Embedding du label en one-hot
+        
 
         # I) Entraînement du Discriminateur
 
@@ -154,10 +158,11 @@ for epoch in range(num_epochs):
         loss_fake = lossFunction(prediction_fake,fake_labels)
 
         #Evaluation pour l'entrainement du discriminateur
-        discrloss = loss_real+loss_fake
-        discrloss.backward()
-        optimiseurDiscr.step()
-        total_discr_loss += discrloss.item()
+        if i % 4 == 0:  # entraîner le discriminateur seulement tous les deux pas
+            discrloss = loss_real+loss_fake
+            discrloss.backward()
+            optimiseurDiscr.step()
+            total_discr_loss += discrloss.item()
 
 
         #Entrainement generateur :
@@ -183,7 +188,7 @@ for epoch in range(num_epochs):
     
     print(f"Epoch [{epoch+1}/{num_epochs}], Discriminator Loss: {avg_discr_loss:.4f}, Generator Loss: {avg_gen_loss:.4f}")
     
-    if epoch % 2 == 0:
+    if epoch % 1 == 0:
         with torch.no_grad():
             fixed_noise = torch.randn(batchsize, 100, 1, 1).to(device)  # Générer 16 échantillons
             generated_images = modelGen(fixed_noise, choicelabels)
