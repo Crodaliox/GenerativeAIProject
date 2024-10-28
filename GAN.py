@@ -21,13 +21,14 @@ from keras import layers
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
-numberRecreated=2
+numberRecreated=3
 
 
 (X_train, Y_train), (X_test, Y_test) = keras.datasets.mnist.load_data()
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)[:, np.newaxis, :, :] 
 labelsTensor = torch.tensor(Y_train).long() 
 
+#on normalise entre -1 et 1 les images
 transforme = transforms.Compose([ 
                         transforms.Normalize([.5],[.5])
                        ])
@@ -125,7 +126,6 @@ for epoch in range(num_epochs):
     total_gen_loss = 0
     nbofrepetition=0
     for i, (real_img, img_labels_ori) in enumerate(data_loader):
-        nbofrepetition+=1
         # Initialisation des gradients
         optimiseurDiscr.zero_grad()
 
@@ -187,7 +187,7 @@ for epoch in range(num_epochs):
     losses_gen.append(avg_gen_loss)
     
     print(f"Epoch [{epoch+1}/{num_epochs}], Discriminator Loss: {avg_discr_loss:.4f}, Generator Loss: {avg_gen_loss:.4f}")
-    
+
     if epoch % 1 == 0:
         with torch.no_grad():
             fixed_noise = torch.randn(batchsize, 100, 1, 1).to(device)  # Générer 16 échantillons
