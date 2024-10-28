@@ -116,7 +116,7 @@ for i in range(iteration):
     #On corrige chaque parametre du model (biais etc...) pour modifier la frontiere de descision grace à la descente de gradient
     grad.step() #Il fait la descente de gradient pour ce step
 
-    #(Calcul de la moyenne d'erreur pour chaque batch afin d'avoir la valeur moyenne de perte pour chaque iteration)
+   
     
     total_loss += lossValue.item()
 

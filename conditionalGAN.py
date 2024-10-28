@@ -21,7 +21,7 @@ from keras import layers
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
-numberRecreated=3
+numberRecreated=8
 
 
 (X_train, Y_train), (X_test, Y_test) = keras.datasets.mnist.load_data()
@@ -46,10 +46,10 @@ class CNN(nn.Module):
     def __init__(self):
             super(CNN, self).__init__() 
             self.label_embedding = nn.Linear(10, 28 * 28)  # Embedding du label dans la même taille que l'image
-            self.conv1 = nn.Conv2d(2, 32, 5, 1, 0, bias=False) #2 cannaux car cannal + label
-            self.bn1 = nn.BatchNorm2d(32)  # Normalisation pour chaque canal :ajuste les activations pour qu'elles aient une moyenne de 0 et un écart-type de 1
+            self.conv1 = nn.Conv2d(2, 64, 5, 1, 0, bias=False) #2 cannaux car cannal + label
+            self.bn1 = nn.BatchNorm2d(64)  # Normalisation pour chaque canal :ajuste les activations pour qu'elles aient une moyenne de 0 et un écart-type de 1
             self.maxpooling1 = nn.MaxPool2d(kernel_size=2, stride=2)
-            self.conv2 = nn.Conv2d(32, 64, 5, 1, 0, bias=False)
+            self.conv2 = nn.Conv2d(64, 64, 5, 1, 0, bias=False)
             self.bn2 = nn.BatchNorm2d(64) 
             self.maxpooling2 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.fcl1 = nn.Linear(64 * 4 * 4, 128)  
@@ -158,7 +158,7 @@ for epoch in range(num_epochs):
         loss_fake = lossFunction(prediction_fake,fake_labels)
 
         #Evaluation pour l'entrainement du discriminateur
-        if i % 2 == 0:  # entraîner le discriminateur seulement tous les deux pas
+        if i % 4 == 0:  # entraîner le discriminateur seulement tous les deux pas
             discrloss = loss_real+loss_fake
             discrloss.backward()
             optimiseurDiscr.step()
